@@ -511,15 +511,25 @@ function drawDrop(x,y,col){
   ctx.fillStyle='rgba(0,0,0,0.22)';ctx.fillRect(x+2,top+5,2,4);
   ctx.fillStyle='#ffffff';ctx.fillRect(x-3,top+4,2,2);ctx.fillRect(x-2,top+3,1,1);
 }
+const glowCache={};
+function flaskGlow(fi,col){
+  const key=fi+col;if(glowCache[key])return glowCache[key];
+  const f=META.flask[fi],c=document.createElement('canvas');c.width=f[2];c.height=f[3];
+  const g=c.getContext('2d');g.drawImage(atlas,f[0],f[1],f[2],f[3],0,0,f[2],f[3]);
+  g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,f[2],f[3]);
+  return glowCache[key]=c;
+}
 function drawFlask(d){
   const fi=FLASK_IDX[d.ci];
   if(!atlas){drawDrop(d.x,d.y,d.col);return}
   const [w,h]=sprSize('flask',fi);
   const x=Math.round(d.x-w/2),y=Math.round(d.y+4-h);
   if(isNeeded(d.ci)){
+    // glowing outline that follows the flask's round shape
     const on=Math.floor(S.time*8+d.ph)%2;
-    ctx.fillStyle=on?'rgba(255,255,255,0.55)':'rgba(255,255,200,0.25)';
-    ctx.fillRect(x-2,y+3,w+4,h-2);
+    const sil=flaskGlow(fi,on?'#ffffff':'#fff27a');
+    for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(sil,x+ox,y+oy);
+    if(on)for(const [ox,oy] of [[-2,0],[2,0],[0,2]]){ctx.globalAlpha=0.45;ctx.drawImage(sil,x+ox,y+oy);ctx.globalAlpha=1}
     const a=S.time*5+d.ph;R(d.x+Math.cos(a)*10,d.y-4+Math.sin(a)*8,1,1,'#ffffff');R(d.x+Math.cos(a+3)*9,d.y-4+Math.sin(a+3)*9,1,1,'#ffffa0');
   }
   sprTo(ctx,'flask',fi,x,y);
@@ -1061,8 +1071,9 @@ function update(dt){
         break;
       }
     }
-    if(!d.caught&&d.ing&&d.y>=FLOOR-3){d.caught=true;sfx.tink();burst(d.x,FLOOR-3,'#cfe8ff',6,60,40);continue}
-    if(!d.caught&&d.y>=FLOOR-5&&!missed)missed=d;
+    // flasks are optional: a missed flask shatters and costs nothing
+    if(!d.caught&&d.ing&&d.y>=FLOOR-5){d.caught=true;sfx.tink();burst(d.x,FLOOR-3,'#cfe8ff',6,60,40);continue}
+    if(!d.caught&&!d.ing&&d.y>=FLOOR-5&&!missed)missed=d;
   }
   S.drops=S.drops.filter(d=>!d.caught);
   if(missed){doMiss(missed);return}
